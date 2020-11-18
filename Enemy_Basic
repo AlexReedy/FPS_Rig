@@ -1,0 +1,54 @@
+extends KinematicBody
+
+onready var enemy_anim = $"Enemy_Anim_Player"
+onready var enemy_sound_death_one=$"AudioStreamPlayer3D"
+onready var enemy_sound_death_two=$"AudioStreamPlayer3D2"
+onready var raycast = $"RayCast"
+
+export var speed = 180
+var space_state
+var target
+
+var dead = false
+var rng = RandomNumberGenerator.new()
+
+func _ready():
+	space_state=get_world().direct_space_state
+	enemy_anim.play("idle")
+
+
+func _process(delta):
+	if target:
+		var result = space_state.intersect_ray(global_transform.origin,target.global_transform.origin)
+		if result.collider.is_in_group("Player"):
+			look_at(target.global_transform.origin,Vector3.UP)
+			move_to_target(delta)
+
+func move_to_target(delta):
+	if not dead:
+		var direction = (target.transform.origin-transform.origin).normalized()
+		move_and_slide(direction * speed * delta,Vector3.UP)
+		enemy_anim.play("walk")
+
+func _on_Area_body_entered(body):
+	if body.is_in_group("Player"):
+		target=body
+		print(body.name + " Entered")
+func _on_Area_body_exited(body):
+	if body.is_in_group("Player"):
+		target=null
+		print(body.name+"Exited")
+			
+func kill():
+	dead=true
+	rng.randomize()
+	var my_random_number = rng.randi_range(0, 1)
+	print("Rand Num is ",my_random_number)
+	$Area/CollisionPolygon.disabled = true
+	$CollisionShape.disabled = true
+	enemy_anim.play("die")
+	if my_random_number == 0:
+		enemy_sound_death_one.play()
+	else:
+		enemy_sound_death_two.play()
+	print("After Kill",enemy_anim.current_animation)
