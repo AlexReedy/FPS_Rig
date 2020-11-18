@@ -1,0 +1,85 @@
+extends KinematicBody
+
+export var speed = 15
+export var acceleration = 8
+export var gravity = 0.9
+export var jump_power = 100
+export var mouse_sensitivity = 0.3
+export var crouch_speed = 15
+export var default_height = 2.5
+export var crouch_height = 0.0000001
+
+onready var head = $Head
+onready var camera = $Head/Camera
+onready var weaponBob_anim = $WeaponBob_anim
+onready var weapon_anim = $WeaponAnimationPlayer
+onready var weapon_sound = $WeaponAudioStreamPlayer
+onready var player_mesh = $CollisionShape
+#onready var footsteps_sound = $Footsteps_AudioStream_Player
+
+#ADDED 11/13/2020##
+var flashlight
+#var muzzleflash
+
+var velocity = Vector3()
+var camera_x_rotation = 0
+
+func _ready():
+	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	flashlight = $Head/Camera/Flashlight
+	#muzzleflash=$Head/Camera/Muzzle_Flash
+	
+func _input(event):
+	if event is InputEventMouseMotion:
+		head.rotate_y(deg2rad(-event.relative.x * mouse_sensitivity))
+
+		var x_delta = event.relative.y * mouse_sensitivity
+		if camera_x_rotation + x_delta > -90 and camera_x_rotation + x_delta < 90: 
+			camera.rotate_x(deg2rad(-x_delta))
+			camera_x_rotation += x_delta
+
+func _process(delta):			
+	if Input.is_action_pressed("exit"):
+		get_tree().quit()
+	if Input.is_action_just_pressed("flashlight"):
+		if flashlight.is_visible_in_tree():
+			flashlight.hide()
+		else:
+			flashlight.show()
+
+func _physics_process(delta):
+	var head_basis = head.get_global_transform().basis
+	
+	#MOVEMENT#
+	var direction = Vector3()
+	if Input.is_action_pressed("move_forward"):
+		direction -= head_basis.z
+	elif Input.is_action_pressed("move_backward"):
+		direction += head_basis.z
+	if Input.is_action_pressed("move_left"):
+		direction -= head_basis.x
+	elif Input.is_action_pressed("move_right"):
+		direction += head_basis.x
+	
+	velocity = velocity.linear_interpolate(direction * speed, acceleration * delta)
+	velocity = move_and_slide(velocity, Vector3.UP)
+	
+	#CROUCH#
+	if Input.is_action_pressed("crouch"):
+		player_mesh.shape.height -= crouch_speed * delta
+	else:
+		player_mesh.shape.height += crouch_speed * delta
+	player_mesh.shape.height = clamp(player_mesh.shape.height,crouch_height,default_height)
+	
+	#JUMP#
+	if Input.is_action_just_pressed("jump") and is_on_floor():
+		velocity.y += jump_power
+	velocity.y -= gravity
+	
+	
+	#WEAPON BOB ANIMATIONS# 
+  # These are unique animations and if none exist, can be edited out#
+	if direction != Vector3():
+		weaponBob_anim.play("weapon_bob")
+	if direction == Vector3():
+		weaponBob_anim.play("weapon_bob_idle")
