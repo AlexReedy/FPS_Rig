@@ -1,0 +1,93 @@
+extends Node
+
+class_name Weapon
+
+export var fire_rate = 0.5
+export var clip_size = 30
+export var reload_rate = 1
+export var damage = 10
+
+onready var ammo_label = $"../UI/Label"
+onready var raycast = $"../Head/Camera/WeaponRayCast"
+#onready var weapon_anim = $"../WeaponAnimationPlayer"
+onready var weapon_sound_fire = $"../Weapon_Fire_AudioStreamPlayer"
+onready var weapon_sound_empty = $"../Weapon_Empty_AudioStreamPlayer"
+onready var weapon_sound_reload =$"../Weapon_Reload_AudioStreamPlayer"
+onready var enemy_collision_shape =$"../Enemy/Cultist/"
+onready var weapon_anim = $"../Weapon_Anim"
+onready var camera_shake = $"../Camera_Shake"
+onready var muzzle_flash_anim=$"../Head/Camera/Muzzle_Flash_Sprite/Muzzle_Flash"
+
+onready var b_decal = preload("res://Scenes/Bullet_Decal.tscn")
+
+
+
+var current_ammo = 0
+var can_fire = true
+var reloading = false
+
+func _ready():
+	current_ammo = clip_size
+	
+func _process(delta):
+	if reloading:
+		ammo_label.set_text("Reloading...")
+	else:
+		ammo_label.set_text("%d / %d" % [current_ammo, clip_size])
+	
+	if Input.is_action_pressed("primary_fire") and can_fire:
+		if current_ammo > 0 and not reloading:
+			weapon_anim.play("Shoot_Anim")
+			muzzle_flash_anim.play("Muzzle_Flash")
+			camera_shake.play("Camera_Shake_Shoot")
+			weapon_sound_fire.play()
+			fire()
+				
+			if current_ammo == 0 and not reloading:
+				weapon_anim.play("Last_Round_Anim")
+				camera_shake.play("Camera_Shake_Shoot")
+				weapon_sound_fire.play()
+				fire()
+			
+		elif Input.is_action_just_pressed("primary_fire") and not reloading:
+			weapon_anim.play("Empty_Anim")
+			weapon_sound_empty.play()
+			
+	if Input.is_action_just_pressed("reload") and not reloading:
+		weapon_anim.play("Reload_Anim")
+		weapon_sound_reload.play()
+		reload()
+
+func check_collision():
+	
+	if raycast.is_colliding():
+		var collider = raycast.get_collider()
+		print("Collided")
+		
+		if !collider.is_in_group("Enemies"):
+			var b = b_decal.instance()
+			collider.add_child(b)
+			b.global_transform.origin = raycast.get_collision_point()
+			b.look_at(raycast.get_collision_point()+raycast.get_collision_normal(),Vector3.UP)
+		
+		if collider.is_in_group("Enemies"):
+			print("Killed " + collider.name)
+			if raycast.is_colliding() and collider.has_method("kill"):
+				collider.kill()
+				
+func fire():
+	print("Fired weapon")
+	can_fire = false
+	current_ammo -= 1
+	check_collision()
+	yield(get_tree().create_timer(fire_rate), "timeout")
+	
+	can_fire = true
+
+func reload():
+	print("Reloading")
+	reloading = true
+	yield(get_tree().create_timer(reload_rate), "timeout")
+	current_ammo = clip_size
+	reloading = false
+	print("Reload complete")
